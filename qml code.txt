@@ -1,82 +1,88 @@
-Item {
-    width: 800
-    height: 600
+import sys
+from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtGui import QMovie
+from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QSlider, QHBoxLayout, QWidget, QPushButton
 
-    property bool videoLoaded: false
 
-    property var mediaPlayer: MediaPlayer {
-        id: videoPlayer
-        autoLoad: false
-        onStatusChanged: {
-            if (status === MediaPlayer.EndOfMedia)
-                playButton.text = "Play"
-        }
-    }
+class VideoPlayer(QMainWindow):
+    def __init__(self):
+        super().__init__()
 
-    property var videoOutput: Item {
-        id: videoOutput
-        width: parent.width
-        height: parent.height
-        onPaint: {
-            var painter = new QPainter(videoOutput)
-            mediaPlayer.videoFrame.map(videoOutput.width, videoOutput.height, QPainter::DeviceCoordinates)
-            painter.drawImage(videoOutput.x, videoOutput.y, mediaPlayer.videoFrame.image)
-            painter.end()
-        }
-    }
+        self.setWindowTitle("Video Player")
+        self.player = QMediaPlayer(self)
 
-    Rectangle {
-        width: parent.width
-        height: parent.height
+        # Create the video label
+        self.video_label = QLabel(self)
+        self.video_label.setAlignment(Qt.AlignCenter)
 
-        FileDialog {
-            id: fileDialog
-            title: "Choose a video file"
-            nameFilters: ["Video files (*.mp4 *.avi)"]
-            onAccepted: {
-                videoPlayer.source = fileDialog.fileUrl
-                videoLoaded = true
-            }
-        }
+        # Create the play and pause buttons
+        self.play_button = QPushButton("Play", self)
+        self.pause_button = QPushButton("Pause", self)
+        self.play_button.clicked.connect(self.play)
+        self.pause_button.clicked.connect(self.pause)
 
-        MouseArea {
-            anchors.fill: parent
-            onClicked: {
-                if (videoPlayer.status === MediaPlayer.PlayingState) {
-                    videoPlayer.pause()
-                    playButton.text = "Play"
-                } else {
-                    if (videoLoaded) {
-                        videoPlayer.play()
-                        playButton.text = "Pause"
-                    } else {
-                        fileDialog.open()
-                    }
-                }
-            }
-        }
+        # Create the progress slider
+        self.progress_slider = QSlider(Qt.Horizontal, self)
+        self.progress_slider.setRange(0, 0)
+        self.progress_slider.sliderMoved.connect(self.set_position)
 
-        Text {
-            id: playButton
-            text: "Play"
-            color: "white"
-            font.pixelSize: 20
-            anchors.centerIn: parent
-        }
+        # Create the layout and add widgets
+        layout = QHBoxLayout()
+        layout.addWidget(self.play_button)
+        layout.addWidget(self.pause_button)
+        layout.addWidget(self.progress_slider)
 
-        Slider {
-            id: progressSlider
-            width: parent.width - 200
-            height: 20
-            anchors.bottom: parent.bottom
-            from: 0
-            to: videoPlayer.duration
-            stepSize: 1000
-            onValueChanged: {
-                if (videoPlayer.status === MediaPlayer.PlayingState)
-                    videoPlayer.pause()
-                videoPlayer.position = value
-            }
-        }
-    }
-}
+        # Create the central widget and set the layout
+        central_widget = QWidget(self)
+        central_widget.setLayout(layout)
+        self.setCentralWidget(central_widget)
+
+    def open_file(self, file_path):
+        # Load the video file
+        media_content = QMediaContent(QUrl.fromLocalFile(file_path))
+        self.player.setMedia(media_content)
+
+        # Connect the player signals to update the UI
+        self.player.durationChanged.connect(self.set_duration)
+        self.player.positionChanged.connect(self.update_position)
+
+        # Set the video label to display the video
+        self.video_label.setMovie(self.player)
+        self.setCentralWidget(self.video_label)
+
+        # Start playing the video
+        self.play()
+
+    def play(self):
+        self.player.play()
+
+    def pause(self):
+        self.player.pause()
+
+    def set_duration(self, duration):
+        self.progress_slider.setRange(0, duration)
+
+    def update_position(self, position):
+        self.progress_slider.setValue(position)
+
+    def set_position(self, position):
+        self.player.setPosition(position)
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    player = VideoPlayer()
+    player.show()
+
+    # Open the video file from file picker dialog
+    file_dialog = QFileDialog()
+    file_path, _ = file_dialog.getOpenFileName(
+        parent=player,
+        caption="Open Video",
+        filter="Video Files (*.mp4 *.avi)"
+    )
+    if file_path:
+        player.open_file(file_path)
+
+    sys.exit(app.exec_())
