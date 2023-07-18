@@ -1,0 +1,82 @@
+Item {
+    width: 800
+    height: 600
+
+    property bool videoLoaded: false
+
+    property var mediaPlayer: MediaPlayer {
+        id: videoPlayer
+        autoLoad: false
+        onStatusChanged: {
+            if (status === MediaPlayer.EndOfMedia)
+                playButton.text = "Play"
+        }
+    }
+
+    property var videoOutput: Item {
+        id: videoOutput
+        width: parent.width
+        height: parent.height
+        onPaint: {
+            var painter = new QPainter(videoOutput)
+            mediaPlayer.videoFrame.map(videoOutput.width, videoOutput.height, QPainter::DeviceCoordinates)
+            painter.drawImage(videoOutput.x, videoOutput.y, mediaPlayer.videoFrame.image)
+            painter.end()
+        }
+    }
+
+    Rectangle {
+        width: parent.width
+        height: parent.height
+
+        FileDialog {
+            id: fileDialog
+            title: "Choose a video file"
+            nameFilters: ["Video files (*.mp4 *.avi)"]
+            onAccepted: {
+                videoPlayer.source = fileDialog.fileUrl
+                videoLoaded = true
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {
+                if (videoPlayer.status === MediaPlayer.PlayingState) {
+                    videoPlayer.pause()
+                    playButton.text = "Play"
+                } else {
+                    if (videoLoaded) {
+                        videoPlayer.play()
+                        playButton.text = "Pause"
+                    } else {
+                        fileDialog.open()
+                    }
+                }
+            }
+        }
+
+        Text {
+            id: playButton
+            text: "Play"
+            color: "white"
+            font.pixelSize: 20
+            anchors.centerIn: parent
+        }
+
+        Slider {
+            id: progressSlider
+            width: parent.width - 200
+            height: 20
+            anchors.bottom: parent.bottom
+            from: 0
+            to: videoPlayer.duration
+            stepSize: 1000
+            onValueChanged: {
+                if (videoPlayer.status === MediaPlayer.PlayingState)
+                    videoPlayer.pause()
+                videoPlayer.position = value
+            }
+        }
+    }
+}
